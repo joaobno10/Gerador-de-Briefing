@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerador de Briefing</title>
+<style>
+  :root {
+    --bg: #ffffff; --surface: #f6f6f7; --line: #e2e2e5; --text: #18181b; --muted: #6b6b73;
+    --accent: #18181b; --accent-text: #ffffff; --warn: #b45309; --warn-bg: #fff7ed; --ok: #15803d;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #18181b; --surface: #222226; --line: #34343a; --text: #f4f4f5; --muted: #a1a1aa;
+      --accent: #f4f4f5; --accent-text: #18181b; --warn: #fbbf24; --warn-bg: #2b2112; --ok: #4ade80; }
+  }
+  html[data-theme="dark"] { --bg: #18181b; --surface: #222226; --line: #34343a; --text: #f4f4f5; --muted: #a1a1aa;
+      --accent: #f4f4f5; --accent-text: #18181b; --warn: #fbbf24; --warn-bg: #2b2112; --ok: #4ade80; }
+  html[data-theme="light"] { --bg: #ffffff; --surface: #f6f6f7; --line: #e2e2e5; --text: #18181b; --muted: #6b6b73;
+      --accent: #18181b; --accent-text: #ffffff; --warn: #b45309; --warn-bg: #fff7ed; --ok: #15803d; }
+
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 18px 28px; }
+
+  header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  header h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+  header .by { color: var(--muted); font-size: 12px; margin-left: 8px; font-weight: 500; }
+  .ghost { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 8px;
+    padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .ghost:hover { color: var(--text); }
+
+  section { border-top: 1px solid var(--line); padding: 18px 0 6px; }
+  section > h2 { font-size: 11px; letter-spacing: .12em; font-weight: 700; color: var(--muted); margin: 0 0 12px; }
+
+  .field { margin-bottom: 12px; }
+  .field > label, .lbl { display: block; font-weight: 600; font-size: 13px; margin-bottom: 5px; }
+  .req::after { content: " *"; color: var(--warn); }
+  .hint { color: var(--muted); font-size: 12px; font-weight: 400; }
+  input[type=text], input[type=url], input[type=number], select, textarea {
+    width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  textarea { min-height: 64px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .missing { border-color: var(--warn) !important; background: var(--warn-bg) !important; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .chip { position: relative; }
+  .chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .chip span { display: inline-block; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px;
+    cursor: pointer; user-select: none; font-weight: 500; }
+  .chip input:checked + span { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .chip input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .box { background: var(--surface); border-radius: var(--radius); padding: 12px; margin-bottom: 10px; }
+  .box h3 { font-size: 13px; margin: 0 0 8px; }
+  .row { display: grid; gap: 8px; grid-template-columns: 1fr 1fr 90px 90px 32px; align-items: end; margin-bottom: 8px; }
+  .row label { font-size: 11px; color: var(--muted); display: block; margin-bottom: 3px; }
+  .icon { width: 32px; height: 36px; border: 1px solid var(--line); background: var(--bg); color: var(--muted);
+    border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1; }
+  .icon:hover { color: var(--text); }
+  .add { background: none; border: 1px dashed var(--line); color: var(--text); border-radius: 8px;
+    padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .two { display: grid; gap: 8px; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 560px) {
+    .row { grid-template-columns: 1fr 1fr; }
+    .row .icon { width: 100%; }
+    .two { grid-template-columns: 1fr; }
+  }
+  [hidden] { display: none !important; }
+
+  footer { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .total { font-size: 13px; color: var(--muted); }
+  .total b { font-size: 20px; color: var(--text); margin-left: 4px; }
+  .primary { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 8px;
+    padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; }
+  .primary:disabled { opacity: .5; cursor: default; }
+  .secondary { background: none; color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 14px; font: inherit; cursor: pointer; }
+
+  .alert { margin-top: 14px; border: 1px solid var(--warn); background: var(--warn-bg); border-radius: var(--radius);
+    padding: 12px 14px; }
+  .alert b { color: var(--warn); }
+  .alert ul { margin: 6px 0 10px; padding-left: 18px; }
+  .alert .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .status { margin-top: 12px; font-size: 13px; }
+  .status.ok { color: var(--ok); }
+  .fallback { margin-top: 10px; }
+  .fallback textarea { min-height: 180px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Gerador de Briefing<span class="by">Por BUENA.I</span></h1>
+    <button type="button" class="ghost" id="btnFull" hidden>Tela cheia</button>
+  </header>
+
+  <form id="f" novalidate autocomplete="off">
+    <!-- JOB -->
+    <section>
+      <h2>JOB</h2>
+      <div class="field">
+        <label for="nome_job" class="req">Nome do job</label>
+        <input type="text" id="nome_job" data-k="nome_job">
+      </div>
+      <div class="field">
+        <label for="tipo" class="req">Tipo</label>
+        <select id="tipo" data-k="tipo">
+          <option value="">Selecione…</option>
+          <option>Peça nova</option>
+          <option>Campanha</option>
+          <option>Desdobramento</option>
+          <option>Refação</option>
+          <option>Ajuste</option>
+        </select>
+      </div>
+      <div id="refacaoBox" hidden>
+        <div class="field">
+          <label for="link_anterior" class="req">Link da peça anterior</label>
+          <input type="url" id="link_anterior" data-k="link_anterior" placeholder="https://">
+        </div>
+        <div class="field">
+          <label for="o_que_mudar" class="req">O que precisa mudar e por quê</label>
+          <textarea id="o_que_mudar" data-k="o_que_mudar"></textarea>
+        </div>
+      </div>
+      <div class="field">
+        <label for="direcionamento" class="req">Direcionamento</label>
+        <textarea id="direcionamento" data-k="direcionamento" placeholder="Objetivo, mensagem principal, oferta, tom…"></textarea>
+      </div>
+      <div class="field">
+        <label for="info_adicionais">Informações adicionais</label>
+        <textarea id="info_adicionais" data-k="info_adicionais"></textarea>
+      </div>
+    </section>
+
+    <!-- OBRIGATORIEDADES -->
+    <section>
+      <h2>OBRIGATORIEDADES</h2>
+      <div class="chips" id="obrigChips"></div>
+      <div id="obrigBoxes"></div>
+    </section>
+
+    <!-- PEÇAS -->
+    <section>
+      <h2>PEÇAS</h2>
+      <div class="chips" id="pecaChips"></div>
+      <div id="pecaBoxes"></div>
+    </section>
+
+    <!-- COMPLEMENTOS -->
+    <section>
+      <h2>COMPLEMENTOS</h2>
+      <div class="field"><label for="casos_anteriores">Casos anteriores</label>
+        <textarea id="casos_anteriores" data-k="casos_anteriores"></textarea></div>
+      <div class="field"><label for="referencias">Referências</label>
+        <textarea id="referencias" data-k="referencias"></textarea></div>
+      <div class="field"><label for="nao_fazer">O que não fazer</label>
+        <textarea id="nao_fazer" data-k="nao_fazer"></textarea></div>
+      <div class="two">
+        <div class="field"><label for="link_arquivos">Link para encontrar os arquivos</label>
+          <input type="url" id="link_arquivos" data-k="link_arquivos" placeholder="https://"></div>
+        <div class="field"><label for="link_salvamento">Link de salvamento</label>
+          <input type="url" id="link_salvamento" data-k="link_salvamento" placeholder="https://"></div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="total">Total de peças<b id="total">0</b></div>
+      <button type="submit" class="primary" id="btnGerar">Gerar briefing</button>
+    </footer>
+
+    <div class="alert" id="alert" hidden>
+      <b>Faltam informações:</b>
+      <ul id="alertList"></ul>
+      <div class="actions">
+        <button type="button" class="secondary" id="btnRevisar">Revisar</button>
+        <button type="button" class="primary" id="btnForcar">Gerar mesmo assim (PENDENTE)</button>
+      </div>
+    </div>
+    <div class="status" id="status" hidden></div>
+    <div class="fallback" id="fallback" hidden>
+      <p class="hint">Não consegui enviar direto para a conversa. O texto abaixo já foi copiado. É só colar no chat:</p>
+      <textarea id="fallbackText" readonly></textarea>
+    </div>
+  </form>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- Configuração (edite aqui) ----------
+  const OBRIGATORIEDADES = ["Selos", "Fontes", "Carros específicos", "Cores", "Outros"];
+  const PECAS = [
+    { id: "Feed",    padrao: { largura: "1080", altura: "1440", unidade: "px" } },
+    { id: "Stories", padrao: { largura: "1080", altura: "1920", unidade: "px" } },
+    { id: "Reels",   padrao: { unidade: "px" } },
+    { id: "Banner",  padrao: { unidade: "px" } },
+    { id: "Adesivo", padrao: { unidade: "cm" } },
+    { id: "Outdoor", padrao: { largura: "9", altura: "3", unidade: "m" } },
+    { id: "Outro",   padrao: { unidade: "px" } }
+  ];
+  const UNIDADES = ["px", "mm", "cm", "m"];
+  const TIPOS_COM_ANTERIOR = ["Refação", "Ajuste"];
+
+  // ---------- Estado ----------
+  const novaVariante = (p) => ({ largura: p.padrao.largura || "", altura: p.padrao.altura || "",
+    unidade: p.padrao.unidade || "px", quantidade: "" });
+  const estadoInicial = () => ({
+    campos: {},
+    obrig: Object.fromEntries(OBRIGATORIEDADES.map(o => [o, { on: false, descricao: "", link: "" }])),
+    pecas: Object.fromEntries(PECAS.map(p => [p.id, { on: false, nome: "", variantes: [novaVariante(p)] }]))
+  });
+  let S = estadoInicial();
+
+  const $ = (s, r = document) => r.querySelector(s);
+  const el = (tag, attrs = {}, kids = []) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "text") n.textContent = v; else if (k in n && k !== "list") n[k] = v; else n.setAttribute(k, v);
+    }
+    for (const c of [].concat(kids)) if (c) n.append(c);
+    return n;
+  };
+
+  // ---------- Ponte com o ChatGPT / host MCP Apps ----------
+  const Bridge = (() => {
+    const oa = () => window.openai;
+    let rpcId = 1; const pend = new Map(); let mcpReady = false; let onPrefill = () => {};
+    const inIframe = window.parent && window.parent !== window;
+
+    function rpc(method, params) {
+      return new Promise((resolve, reject) => {
+        const id = rpcId++; pend.set(id, { resolve, reject });
+        window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
+        setTimeout(() => { if (pend.has(id)) { pend.delete(id); reject(new Error("timeout")); } }, 8000);
+      });
+    }
+    function notify(method, params) { window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*"); }
+
+    window.addEventListener("message", (ev) => {
+      if (ev.source !== window.parent) return;
+      const m = ev.data; if (!m || m.jsonrpc !== "2.0") return;
+      if (m.id != null && pend.has(m.id) && !m.method) {
+        const p = pend.get(m.id); pend.delete(m.id);
+        m.error ? p.reject(m.error) : p.resolve(m.result); return;
+      }
+      if (m.method === "ui/notifications/tool-input") onPrefill(m.params && m.params.arguments);
+      if (m.method === "ui/notifications/tool-result") onPrefill(m.params && m.params.structuredContent && m.params.structuredContent.prefill);
+      if (m.method === "ui/notifications/host-context-changed") applyTheme(m.params && m.params.theme);
+      if (m.method === "ui/resource-teardown" || m.method === "ping") {
+        if (m.id != null) window.parent.postMessage({ jsonrpc: "2.0", id: m.id, result: {} }, "*");
+      }
+    });
+
+    function applyTheme(t) { if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; }
+
+    async function init(prefillCb) {
+      onPrefill = (p) => { if (p && typeof p === "object") prefillCb(p); };
+      if (oa()) {
+        applyTheme(oa().theme);
+        onPrefill(oa().toolInput);
+        onPrefill(oa().toolOutput && oa().toolOutput.prefill);
+        window.addEventListener("openai:set_globals", () => {
+          onPrefill(oa().toolOutput && oa().toolOutput.prefill); applyTheme(oa().theme);
+        });
+        if (typeof oa().requestDisplayMode === "function") $("#btnFull").hidden = false;
+        return;
+      }
+      if (!inIframe) return;
+      try {
+        const r = await rpc("ui/initialize", {
+          protocolVersion: "2026-01-26",
+          appInfo: { name: "gerador-briefing", version: "1.0.0" },
+          clientInfo: { name: "gerador-briefing", version: "1.0.0" },
+          appCapabilities: {}
+        });
+        mcpReady = true;
+        applyTheme(r && r.hostContext && r.hostContext.theme);
+        notify("ui/notifications/initialized", {});
+        const ro = new ResizeObserver(() => notify("ui/notifications/size-changed",
+          { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
+        ro.observe(document.body);
+      } catch (_) { /* host sem MCP Apps: segue em modo local */ }
+    }
+
+    async function sendToChat(text) {
+      if (oa() && typeof oa().sendFollowUpMessage === "function") {
+        await oa().sendFollowUpMessage({ prompt: text }); return true;
+      }
+      if (mcpReady) {
+        await rpc("ui/message", { role: "user", content: [{ type: "text", text }] }); return true;
+      }
+      return false;
+    }
+
+    function saveState(state) {
+      try { if (oa() && typeof oa().setWidgetState === "function") oa().setWidgetState(state); } catch (_) {}
+      try { sessionStorage.setItem("gerador-briefing", JSON.stringify(state)); } catch (_) {}
+    }
+    function loadState() {
+      try { if (oa() && oa().widgetState && oa().widgetState.campos) return oa().widgetState; } catch (_) {}
+      try { const s = sessionStorage.getItem("gerador-briefing"); if (s) return JSON.parse(s); } catch (_) {}
+      return null;
+    }
+    function fullscreen() { try { oa().requestDisplayMode({ mode: "fullscreen" }); } catch (_) {} }
+
+    return { init, sendToChat, saveState, loadState, fullscreen };
+  })();
+
+  // ---------- Renderização ----------
+  function renderObrig() {
+    const chips = $("#obrigChips"), boxes = $("#obrigBoxes");
+    chips.innerHTML = ""; boxes.innerHTML = "";
+    OBRIGATORIEDADES.forEach((o, i) => {
+      const st = S.obrig[o];
+      const cb = el("input", { type: "checkbox", id: "ob" + i, checked: st.on });
+      cb.addEventListener("change", () => { st.on = cb.checked; box.hidden = !st.on; changed(); });
+      chips.append(el("label", { className: "chip", htmlFor: "ob" + i }, [cb, el("span", { text: o })]));
+
+      const d = el("textarea", { value: st.descricao, placeholder: "Descreva o que é obrigatório" });
+      d.dataset.check = `obrig:${o}`;
+      d.addEventListener("input", () => { st.descricao = d.value; changed(); });
+      const l = el("input", { type: "url", value: st.link, placeholder: "https://" });
+      l.addEventListener("input", () => { st.link = l.value; changed(); });
+      const box = el("div", { className: "box", hidden: !st.on }, [
+        el("h3", { text: o }),
+        el("div", { className: "field" }, [el("span", { className: "lbl req", text: "Descrição" }), d]),
+        el("div", { className: "field" }, [el("span", { className: "lbl", text: "Link " }, [el("span", { className: "hint", text: "(opcional)" })]), l])
+      ]);
+      boxes.append(box);
+    });
+  }
+
+  function renderPecas() {
+    const chips = $("#pecaChips"), boxes = $("#pecaBoxes");
+    chips.innerHTML = ""; boxes.innerHTML = "";
+    PECAS.forEach((p, i) => {
+      const st = S.pecas[p.id];
+      const cb = el("input", { type: "checkbox", id: "pc" + i, checked: st.on });
+      cb.addEventListener("change", () => { st.on = cb.checked; box.hidden = !st.on; changed(); });
+      chips.append(el("label", { className: "chip", htmlFor: "pc" + i }, [cb, el("span", { text: p.id })]));
+
+      const list = el("div");
+      const box = el("div", { className: "box", hidden: !st.on }, [el("h3", { text: p.id })]);
+      if (p.id === "Outro") {
+        const n = el("input", { type: "text", value: st.nome, placeholder: "Ex.: Totem, Flyer, Painel de LED…" });
+        n.dataset.check = "outro-nome";
+        n.addEventListener("input", () => { st.nome = n.value; changed(); });
+        box.append(el("div", { className: "field" }, [el("span", { className: "lbl req", text: "Qual peça?" }), n]));
+      }
+      box.append(list);
+      const add = el("button", { type: "button", className: "add", text: "+ Adicionar variante" });
+      add.addEventListener("click", () => { st.variantes.push(novaVariante(p)); drawRows(); changed(); });
+      box.append(add);
+      boxes.append(box);
+
+      function drawRows() {
+        list.innerHTML = "";
+        st.variantes.forEach((v, vi) => {
+          const mk = (key, label, type = "number") => {
+            const inp = el("input", { type, value: v[key], min: "0", step: "any", inputMode: "decimal" });
+            inp.dataset.check = `var:${p.id}:${vi}:${key}`;
+            inp.addEventListener("input", () => { v[key] = inp.value; changed(); });
+            return el("div", {}, [el("label", { text: label }), inp]);
+          };
+          const sel = el("select");
+          UNIDADES.forEach(u => sel.append(el("option", { value: u, text: u, selected: v.unidade === u })));
+          sel.addEventListener("change", () => { v.unidade = sel.value; changed(); });
+          const rm = el("button", { type: "button", className: "icon", title: "Remover variante", text: "×" });
+          rm.disabled = st.variantes.length === 1;
+          rm.addEventListener("click", () => { st.variantes.splice(vi, 1); drawRows(); changed(); });
+          list.append(el("div", { className: "row" }, [
+            mk("largura", "Largura"), mk("altura", "Altura"),
+            el("div", {}, [el("label", { text: "Unidade" }), sel]),
+            mk("quantidade", "Qtd."), rm
+          ]));
+        });
+      }
+      drawRows();
+    });
+  }
+
+  function bindCampos() {
+    document.querySelectorAll("[data-k]").forEach(inp => {
+      const k = inp.dataset.k;
+      if (S.campos[k] != null) inp.value = S.campos[k];
+      inp.addEventListener("input", () => { S.campos[k] = inp.value; changed(); });
+      inp.addEventListener("change", () => { S.campos[k] = inp.value; changed(); });
+    });
+  }
+
+  // ---------- Regras ----------
+  const v = (k) => (S.campos[k] || "").trim();
+  const pecasAtivas = () => PECAS.filter(p => S.pecas[p.id].on);
+  const total = () => pecasAtivas().reduce((t, p) =>
+    t + S.pecas[p.id].variantes.reduce((a, x) => a + (parseInt(x.quantidade, 10) > 0 ? parseInt(x.quantidade, 10) : 0), 0), 0);
+
+  function pendencias() {
+    const out = []; const marcar = [];
+    const need = (cond, msg, sel) => { if (!cond) { out.push(msg); if (sel) marcar.push(sel); } };
+    need(v("nome_job"), "Nome do job", "#nome_job");
+    need(v("tipo"), "Tipo", "#tipo");
+    if (TIPOS_COM_ANTERIOR.includes(v("tipo"))) {
+      need(v("link_anterior"), "Link da peça anterior", "#link_anterior");
+      need(v("o_que_mudar"), "O que precisa mudar e por quê", "#o_que_mudar");
+    }
+    need(v("direcionamento"), "Direcionamento", "#direcionamento");
+    OBRIGATORIEDADES.forEach(o => {
+      const st = S.obrig[o];
+      if (st.on) need(st.descricao.trim(), `Obrigatoriedade “${o}”: descrição`, `[data-check="obrig:${o}"]`);
+    });
+    const ativas = pecasAtivas();
+    need(ativas.length, "Selecione pelo menos uma peça");
+    ativas.forEach(p => {
+      const st = S.pecas[p.id];
+      if (p.id === "Outro") need(st.nome.trim(), "Peça “Outro”: qual peça", `[data-check="outro-nome"]`);
+      st.variantes.forEach((x, i) => {
+        const tag = st.variantes.length > 1 ? `${p.id} (variante ${i + 1})` : p.id;
+        const faltam = [];
+        ["largura", "altura", "quantidade"].forEach(k => {
+          if (!(parseFloat(x[k]) > 0)) { faltam.push(k); marcar.push(`[data-check="var:${p.id}:${i}:${k}"]`); }
+        });
+        if (faltam.length) out.push(`${tag}: ${faltam.join(", ")}`);
+      });
+    });
+    return { lista: out, marcar };
+  }
+
+  // ---------- Texto enviado à conversa ----------
+  function montarTexto(lista) {
+    const n = (x) => (x && String(x).trim()) ? String(x).trim() : "— (não informado)";
+    const L = [];
+    L.push("[Gerador de Briefing] Dados enviados pelo formulário. Gere o briefing final seguindo as regras do Gerador, sem inventar nada além destes dados.");
+    L.push("");
+    L.push("STATUS: " + (lista.length ? "PENDENTE — briefing não validado" : "COMPLETO"));
+    if (lista.length) L.push("Pendências: " + lista.join("; "));
+    L.push("", "## JOB");
+    L.push("Nome do job: " + n(v("nome_job")));
+    L.push("Tipo: " + n(v("tipo")));
+    if (TIPOS_COM_ANTERIOR.includes(v("tipo"))) {
+      L.push("Link da peça anterior: " + n(v("link_anterior")));
+      L.push("O que precisa mudar e por quê: " + n(v("o_que_mudar")));
+    }
+    L.push("Direcionamento: " + n(v("direcionamento")));
+    L.push("Informações adicionais: " + n(v("info_adicionais")));
+    L.push("", "## OBRIGATORIEDADES");
+    const ob = OBRIGATORIEDADES.filter(o => S.obrig[o].on);
+    if (!ob.length) L.push("Nenhuma selecionada.");
+    ob.forEach(o => {
+      const st = S.obrig[o];
+      L.push(`- ${o}: ${n(st.descricao)}` + (st.link.trim() ? ` (link: ${st.link.trim()})` : ""));
+    });
+    L.push("", `## PEÇAS (total: ${total()})`);
+    const at = pecasAtivas();
+    if (!at.length) L.push("Nenhuma selecionada.");
+    at.forEach(p => {
+      const st = S.pecas[p.id];
+      const nome = p.id === "Outro" ? `Outro — ${n(st.nome)}` : p.id;
+      st.variantes.forEach(x => {
+        const med = (x.largura || "?") + " × " + (x.altura || "?") + " " + x.unidade;
+        const q = parseInt(x.quantidade, 10) > 0 ? parseInt(x.quantidade, 10) : "?";
+        L.push(`- ${nome}: ${med} — ${q} un.`);
+      });
+    });
+    L.push("", "## COMPLEMENTOS");
+    L.push("Casos anteriores: " + n(v("casos_anteriores")));
+    L.push("Referências: " + n(v("referencias")));
+    L.push("O que não fazer: " + n(v("nao_fazer")));
+    L.push("Link para encontrar os arquivos: " + n(v("link_arquivos")));
+    L.push("Link de salvamento: " + n(v("link_salvamento")));
+    return L.join("\n");
+  }
+
+  // ---------- Fluxo ----------
+  let saveT;
+  function changed() {
+    $("#total").textContent = total();
+    $("#refacaoBox").hidden = !TIPOS_COM_ANTERIOR.includes(v("tipo"));
+    if (!$("#alert").hidden) mostrarPendencias(pendencias(), false);
+    clearTimeout(saveT); saveT = setTimeout(() => Bridge.saveState(S), 300);
+  }
+
+  function mostrarPendencias(p, focar) {
+    document.querySelectorAll(".missing").forEach(n => n.classList.remove("missing"));
+    if (!p.lista.length) { $("#alert").hidden = true; return; }
+    p.marcar.forEach(s => document.querySelectorAll(s).forEach(n => n.classList.add("missing")));
+    const ul = $("#alertList"); ul.innerHTML = "";
+    p.lista.forEach(t => ul.append(el("li", { text: t })));
+    $("#alert").hidden = false;
+    if (focar) { const first = document.querySelector(".missing"); (first || $("#alert")).scrollIntoView({ behavior: "smooth", block: "center" }); }
+  }
+
+  async function enviar(lista) {
+    const texto = montarTexto(lista);
+    const btns = [$("#btnGerar"), $("#btnForcar")]; btns.forEach(b => b.disabled = true);
+    const st = $("#status"); st.hidden = false; st.className = "status"; st.textContent = "Enviando…";
+    let ok = false;
+    try { ok = await Bridge.sendToChat(texto); } catch (_) { ok = false; }
+    btns.forEach(b => b.disabled = false);
+    if (ok) {
+      $("#alert").hidden = true; $("#fallback").hidden = true;
+      st.className = "status ok"; st.textContent = "✓ Dados enviados. O briefing está sendo gerado na conversa.";
+    } else {
+      st.hidden = true;
+      $("#fallbackText").value = texto; $("#fallback").hidden = false;
+      try { await navigator.clipboard.writeText(texto); } catch (_) { $("#fallbackText").select(); }
+    }
+  }
+
+  function aplicarPrefill(p) {
+    let mudou = false;
+    for (const k of ["nome_job", "tipo", "direcionamento"]) {
+      if (typeof p[k] === "string" && p[k].trim() && !v(k)) {
+        S.campos[k] = p[k].trim(); const inp = document.querySelector(`[data-k="${k}"]`); if (inp) inp.value = S.campos[k]; mudou = true;
+      }
+    }
+    if (mudou) changed();
+  }
+
+  // ---------- Início ----------
+  const salvo = Bridge.loadState();
+  if (salvo && salvo.campos && salvo.obrig && salvo.pecas) {
+    const base = estadoInicial();
+    S = { campos: salvo.campos, obrig: { ...base.obrig, ...salvo.obrig }, pecas: { ...base.pecas, ...salvo.pecas } };
+  }
+  bindCampos(); renderObrig(); renderPecas(); changed();
+  Bridge.init(aplicarPrefill);
+
+  $("#f").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const p = pendencias();
+    if (p.lista.length) { mostrarPendencias(p, true); return; }
+    mostrarPendencias(p, false); enviar([]);
+  });
+  $("#btnRevisar").addEventListener("click", () => mostrarPendencias(pendencias(), true));
+  $("#btnForcar").addEventListener("click", () => enviar(pendencias().lista));
+  $("#btnFull").addEventListener("click", () => Bridge.fullscreen());
+})();
+</script>
+</body>
+</html>
