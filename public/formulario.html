@@ -20,9 +20,10 @@
       --accent: #18181b; --accent-text: #ffffff; --warn: #b45309; --warn-bg: #fff7ed; --ok: #15803d; }
 
   * { box-sizing: border-box; }
+  html, body { height: auto; min-height: 0; }
   body { margin: 0; background: var(--bg); color: var(--text);
     font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 18px 28px; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 18px 16px; }
 
   header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
   header h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
@@ -301,6 +302,20 @@
       }
     });
 
+    // Informa a altura REAL do conteúdo (sobe e desce), para não sobrar espaço em branco.
+    let lastH = 0, roOn = false;
+    function sendHeight() {
+      const h = Math.ceil(document.querySelector(".wrap").getBoundingClientRect().height);
+      if (!h || h === lastH) return;
+      lastH = h;
+      if (mcpReady) notify("ui/notifications/size-changed", { width: document.documentElement.clientWidth, height: h });
+      try { if (oa() && typeof oa().notifyIntrinsicHeight === "function") oa().notifyIntrinsicHeight(h); } catch (_) {}
+    }
+    function reportHeight() {
+      sendHeight();
+      if (!roOn) { roOn = true; new ResizeObserver(sendHeight).observe(document.querySelector(".wrap")); }
+    }
+
     function applyTheme(t) { if (t === "dark" || t === "light") document.documentElement.dataset.theme = t; }
 
     async function init(prefillCb) {
@@ -314,6 +329,7 @@
       };
       readOa();
       window.addEventListener("openai:set_globals", readOa);
+      if (oa()) reportHeight();
       if (!inIframe) return;
       // Handshake MCP Apps: o ChatGPT espera por ele para considerar o formulário carregado.
       try {
@@ -326,9 +342,7 @@
         mcpReady = true;
         applyTheme(r && r.hostContext && r.hostContext.theme);
         notify("ui/notifications/initialized", {});
-        const ro = new ResizeObserver(() => notify("ui/notifications/size-changed",
-          { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
-        ro.observe(document.body);
+        reportHeight();
         readOa();
       } catch (_) { /* host sem MCP Apps */ }
     }
