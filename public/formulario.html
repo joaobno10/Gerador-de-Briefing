@@ -261,17 +261,18 @@
 
     async function init(prefillCb) {
       onPrefill = (p) => { if (p && typeof p === "object") prefillCb(p); };
-      if (oa()) {
+      // Extras do ChatGPT (opcionais) — nunca substituem o handshake padrão.
+      const readOa = () => {
+        if (!oa()) return;
         applyTheme(oa().theme);
         onPrefill(oa().toolInput);
         onPrefill(oa().toolOutput && oa().toolOutput.prefill);
-        window.addEventListener("openai:set_globals", () => {
-          onPrefill(oa().toolOutput && oa().toolOutput.prefill); applyTheme(oa().theme);
-        });
         if (typeof oa().requestDisplayMode === "function") $("#btnFull").hidden = false;
-        return;
-      }
+      };
+      readOa();
+      window.addEventListener("openai:set_globals", readOa);
       if (!inIframe) return;
+      // Handshake MCP Apps: o ChatGPT espera por ele para considerar o formulário carregado.
       try {
         const r = await rpc("ui/initialize", {
           protocolVersion: "2026-01-26",
@@ -285,15 +286,17 @@
         const ro = new ResizeObserver(() => notify("ui/notifications/size-changed",
           { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight }));
         ro.observe(document.body);
-      } catch (_) { /* host sem MCP Apps: segue em modo local */ }
+        readOa();
+      } catch (_) { /* host sem MCP Apps: segue com window.openai ou modo local */ }
     }
 
     async function sendToChat(text) {
+      if (mcpReady) {
+        try { await rpc("ui/message", { role: "user", content: [{ type: "text", text }] }); return true; }
+        catch (_) { /* tenta a alternativa abaixo */ }
+      }
       if (oa() && typeof oa().sendFollowUpMessage === "function") {
         await oa().sendFollowUpMessage({ prompt: text }); return true;
-      }
-      if (mcpReady) {
-        await rpc("ui/message", { role: "user", content: [{ type: "text", text }] }); return true;
       }
       return false;
     }
