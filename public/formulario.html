@@ -606,6 +606,27 @@
     };
   }
 
+  function textoLocal(d) {
+    const j = d.job, c = d.complementos, L = [];
+    const sec = (t, x) => { if (x && String(x).trim()) L.push("", t, String(x).trim()); };
+    L.push(`BRIEFING — ${j.nome || "(sem nome)"}`, `Tipo: ${j.tipo || "—"}`);
+    if (d.status === "PENDENTE") L.push("", "⚠ PENDENTE — briefing não validado", "Pendências: " + d.pendencias.join("; "));
+    const r = [];
+    if (j.link_anterior) r.push(`Peça anterior: ${j.link_anterior}`);
+    if (j.o_que_mudar) r.push(`O que mudar e por quê: ${j.o_que_mudar}`);
+    if (j.recusado) r.push(`Recusado pelo cliente (não repetir): ${j.recusado}`);
+    sec((j.tipo || "AJUSTE").toUpperCase(), r.join("\n"));
+    sec("DIRECIONAMENTO", j.direcionamento); sec("INFORMAÇÕES ADICIONAIS", j.info_adicionais);
+    sec("OBRIGATORIEDADES", d.obrigatoriedades.map(o => `• ${o.item}: ${o.descricao || "—"}${o.link ? ` — ${o.link}` : ""}`).join("\n"));
+    sec(`PEÇAS (total: ${d.total})`, d.pecas.map(p => `• ${p.peca} — ${p.largura || "?"} × ${p.altura || "?"} ${p.unidade}${p.observacao ? ` (${p.observacao})` : ""} — ${p.quantidade || "?"} un.`).join("\n"));
+    sec("CASOS ANTERIORES", c.casos_anteriores); sec("REFERÊNCIAS", c.referencias); sec("O QUE NÃO FAZER", c.nao_fazer);
+    const arq = [];
+    if (c.link_arquivos) arq.push(`Onde encontrar: ${c.link_arquivos}`);
+    if (c.link_salvamento) arq.push(`Onde salvar: ${c.link_salvamento}`);
+    sec("ARQUIVOS", arq.join("\n"));
+    return L.join("\n");
+  }
+
   // ---------- Fluxo ----------
   let saveT;
   function changed() {
@@ -647,10 +668,21 @@
         const r = await Bridge.callTool("preparar_briefing", { dados });
         S.view = "resultado"; S.resultado = { briefing: r.structuredContent.briefing, aviso: "Modo teste: no ChatGPT o direcionamento é revisado antes de aparecer aqui." };
       } else {
-        const r = await Bridge.callTool("preparar_briefing", { dados });
-        const sc = r && (r.structuredContent || (r.result && r.result.structuredContent));
-        if (!sc || !sc.codigo) throw new Error((r && r.content && r.content[0] && r.content[0].text) || "resposta vazia do servidor");
-        await Bridge.sendMessage(`Gerar briefing • ${dados.job.nome || "sem nome"} (#${sc.codigo})`);
+        let codigo = null;
+        try {
+          const r = await Bridge.callTool("preparar_briefing", { dados });
+          const sc = r && (r.structuredContent || (r.result && r.result.structuredContent));
+          if (sc && sc.codigo) codigo = sc.codigo;
+        } catch (_) { /* app desatualizado no ChatGPT: usa o plano B */ }
+        if (codigo) {
+          await Bridge.sendMessage(`Gerar briefing • ${dados.job.nome || "sem nome"} (#${codigo})`);
+        } else {
+          // Plano B: manda os dados na mensagem (funciona mesmo com a lista de ferramentas antiga).
+          await Bridge.sendMessage(
+            "Gerar briefing. Aja como diretor de arte sênior: reescreva só DIRECIONAMENTO e INFORMAÇÕES ADICIONAIS " +
+            "de forma clara para o designer, sem inventar nada e sem encher linguiça; mantenha o resto igual. " +
+            "Entregue o briefing final em um único bloco de código para copiar, sem comentários.\n\n" + textoLocal(dados));
+        }
         S.view = "enviado";
       }
       salvar(); mostrarView(); window.scrollTo(0, 0);
