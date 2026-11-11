@@ -18,13 +18,11 @@ import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
-const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || "").trim().replace(/^["']|["']$/g, "");
-const OPENAI_MODEL = String(process.env.OPENAI_MODEL || "gpt-5.4-mini").trim();
-// Se o modelo escolhido não existir na conta, tenta estes em ordem.
-const MODELOS = [...new Set([OPENAI_MODEL, "gpt-5.4-mini", "gpt-5-mini", "gpt-4.1-mini"])];
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.4-mini";
 const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
 
-const SERVER_INFO = { name: "gerador-briefing", title: "Gerador de Briefing", version: "1.1.1" };
+const SERVER_INFO = { name: "gerador-briefing", title: "Gerador de Briefing", version: "1.1.0" };
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 const UI_URI = "ui://gerador-briefing/formulario.html";
@@ -106,36 +104,8 @@ Regras:
 - "informacoes_adicionais": organize e deixe claro o que o atendimento escreveu. Se veio vazio, devolva "".
 - Português do Brasil.`;
 
-// Traduz os erros mais comuns da OpenAI para algo que dê para agir.
-function explicarErro(status, data) {
-  const e = (data && data.error) || {};
-  const msg = String(e.message || "");
-  if (status === 401) return "chave da OpenAI inválida ou revogada: confira a OPENAI_API_KEY no Render";
-  if (e.code === "insufficient_quota" || /quota|billing/i.test(msg)) return "a conta da OpenAI está sem créditos: adicione em platform.openai.com → Billing";
-  if (status === 429) return "limite de uso da OpenAI atingido, tente de novo em instantes";
-  if (status === 403) return "a chave não tem permissão para este modelo/projeto";
-  return msg || `erro ${status} da OpenAI`;
-}
-const modeloInexistente = (status, data) => {
-  const e = (data && data.error) || {};
-  return status === 404 || e.code === "model_not_found" || /model.*(not exist|not found|does not have access)/i.test(String(e.message || ""));
-};
-
-async function chamarOpenAI(payload) {
-  const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 45000);
-  try {
-    const r = await fetch(`${OPENAI_BASE_URL}/responses`, {
-      method: "POST", signal: ctrl.signal,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
-      body: JSON.stringify(payload)
-    });
-    let data = {}; try { data = await r.json(); } catch (_) {}
-    return { status: r.status, ok: r.ok, data };
-  } finally { clearTimeout(t); }
-}
-
 async function revisarComIA(d) {
-  if (!OPENAI_API_KEY) return { ok: false, motivo: "falta a OPENAI_API_KEY no Render (Environment)" };
+  if (!OPENAI_API_KEY) return { ok: false, motivo: "sem chave da OpenAI configurada no servidor" };
   const j = d.job || {};
   const contexto = {
     tipo: j.tipo, nome_do_job: j.nome,
@@ -145,45 +115,44 @@ async function revisarComIA(d) {
     obrigatoriedades: (d.obrigatoriedades || []).map(o => `${o.item}: ${o.descricao}`),
     o_que_nao_fazer: d.complementos && d.complementos.nao_fazer || undefined
   };
-  const schema = {
-    type: "object", additionalProperties: false,
-    properties: { direcionamento: { type: "string" }, informacoes_adicionais: { type: "string" } },
-    required: ["direcionamento", "informacoes_adicionais"]
-  };
-  const base = {
+  const body = (comReasoning) => JSON.stringify({
+    model: OPENAI_MODEL,
     instructions: PROMPT_DA,
-    input: "Dados do briefing (JSON):\n" + JSON.stringify(contexto, null, 2) +
-      '\n\nResponda só com JSON: {"direcionamento": "...", "informacoes_adicionais": "..."}'
-  };
-  // Tenta do jeito mais completo para o mais simples, e troca de modelo se o atual não existir.
-  const variantes = [
-    { reasoning: { effort: "low" }, text: { format: { type: "json_schema", name: "briefing_revisado", strict: true, schema } } },
-    { text: { format: { type: "json_schema", name: "briefing_revisado", strict: true, schema } } },
-    { text: { format: { type: "json_object" } } }
-  ];
-  let ultimoMotivo = "";
-  try {
-    for (const model of MODELOS) {
-      for (const v of variantes) {
-        const r = await chamarOpenAI({ model, ...base, ...v });
-        if (r.ok) {
-          let txt = "";
-          for (const item of r.data.output || []) for (const c of item.content || []) if (c.type === "output_text") txt += c.text;
-          const m = txt.match(/\{[\s\S]*\}/);
-          const out = JSON.parse(m ? m[0] : txt);
-          if (model !== OPENAI_MODEL) console.warn(`IA: usei ${model} porque ${OPENAI_MODEL} não está disponível`);
-          return { ok: true, modelo: model, direcionamento: String(out.direcionamento || "").trim(), info: String(out.informacoes_adicionais || "").trim() };
+    input: "Dados do briefing (JSON):\n" + JSON.stringify(contexto, null, 2),
+    ...(comReasoning ? { reasoning: { effort: "low" } } : {}),
+    text: {
+      format: {
+        type: "json_schema", name: "briefing_revisado", strict: true,
+        schema: {
+          type: "object", additionalProperties: false,
+          properties: { direcionamento: { type: "string" }, informacoes_adicionais: { type: "string" } },
+          required: ["direcionamento", "informacoes_adicionais"]
         }
-        console.error(`IA falhou (${model}, ${r.status}):`, JSON.stringify(r.data.error || r.data).slice(0, 300));
-        if (modeloInexistente(r.status, r.data)) { ultimoMotivo = `modelo ${model} indisponível`; break; } // próximo modelo
-        if (r.status === 400) { ultimoMotivo = explicarErro(r.status, r.data); continue; }    // próxima variante
-        return { ok: false, motivo: explicarErro(r.status, r.data) };                          // 401, 429… não adianta insistir
       }
     }
-    return { ok: false, motivo: ultimoMotivo || "a OpenAI recusou o pedido" };
+  });
+  const chamar = async (comReasoning) => {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      return await fetch(`${OPENAI_BASE_URL}/responses`, {
+        method: "POST", signal: ctrl.signal,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${OPENAI_API_KEY}` },
+        body: body(comReasoning)
+      });
+    } finally { clearTimeout(t); }
+  };
+  try {
+    let r = await chamar(true);
+    if (r.status === 400) r = await chamar(false); // modelo sem suporte a "reasoning"
+    const data = await r.json();
+    if (!r.ok) return { ok: false, motivo: (data.error && data.error.message) || `erro ${r.status}` };
+    let txt = "";
+    for (const item of data.output || []) for (const c of item.content || []) if (c.type === "output_text") txt += c.text;
+    const out = JSON.parse(txt);
+    return { ok: true, direcionamento: String(out.direcionamento || "").trim(), info: String(out.informacoes_adicionais || "").trim() };
   } catch (e) {
     console.error("IA falhou:", e.message);
-    return { ok: false, motivo: e.name === "AbortError" ? "a IA demorou demais para responder" : `sem conexão com a OpenAI (${e.message})` };
+    return { ok: false, motivo: e.name === "AbortError" ? "a IA demorou demais" : e.message };
   }
 }
 
@@ -237,13 +206,7 @@ async function gerarBriefing(d = {}) {
 }
 
 // ------------------------------------------------------------------ MCP
-function publicOrigin(req) {
-  const proto = String(req.headers["x-forwarded-proto"] || "http").split(",")[0].trim();
-  return `${proto}://${req.headers.host}`;
-}
-const formHtmlFor = (origin) => formHtml().replace("__SERVER_ORIGIN__", origin);
-
-async function handleRpc(msg, ctx = {}) {
+async function handleRpc(msg) {
   const { id, method, params = {} } = msg;
   const ok = (result) => ({ jsonrpc: "2.0", id, result });
   const fail = (code, message) => ({ jsonrpc: "2.0", id, error: { code, message } });
@@ -299,10 +262,9 @@ async function handleRpc(msg, ctx = {}) {
         contents: [{
           uri: UI_URI,
           mimeType: UI_MIME,
-          text: formHtmlFor(ctx.origin || ""),
+          text: formHtml(),
           _meta: {
-            ui: { prefersBorder: true, csp: { connectDomains: ctx.origin ? [ctx.origin] : [], resourceDomains: [] }, permissions: { clipboardWrite: {} } },
-            "openai/widgetCSP": { connect_domains: ctx.origin ? [ctx.origin] : [], resource_domains: [] },
+            ui: { prefersBorder: true, csp: { connectDomains: [], resourceDomains: [] }, permissions: { clipboardWrite: {} } },
             "openai/widgetDescription": "Formulário de briefing de criação. Gera e exibe o briefing final dentro do próprio formulário.",
             "openai/widgetPrefersBorder": true
           }
@@ -351,25 +313,12 @@ const server = http.createServer(async (req, res) => {
       "Endereço para conectar no ChatGPT: <b>" + (req.headers["x-forwarded-proto"] || "http") + "://" +
       req.headers.host + "/mcp</b><br>" +
       "IA de revisão: " + (OPENAI_API_KEY ? `✅ ativa (${OPENAI_MODEL})` : "⚠ desativada (falta OPENAI_API_KEY)") + "<br>" +
-      "<a href='/testar-ia'>Testar a IA agora</a> · <a href='/preview'>Ver formulário (modo teste)</a></body>",
+      "<a href='/preview'>Ver formulário (modo teste)</a></body>",
       "text/html; charset=utf-8");
   }
 
-  if (path === "/testar-ia" && req.method === "GET") {
-    const t0 = Date.now();
-    const r = await revisarComIA({ job: { tipo: "Criação", nome: "Teste", direcionamento: "compass com taxa zero, destacar a taxa", info_adicionais: "valido ate dia 30" } });
-    const seg = ((Date.now() - t0) / 1000).toFixed(1);
-    const esc = (x) => String(x).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
-    return send(res, 200,
-      "<!doctype html><meta charset=utf-8><title>Teste da IA</title><body style='font-family:system-ui;padding:40px;line-height:1.6;max-width:720px'>" +
-      (r.ok
-        ? `<h2>✅ IA funcionando</h2>Modelo: <b>${esc(r.modelo)}</b> · ${seg}s<h3>Direcionamento revisado</h3><pre style='white-space:pre-wrap'>${esc(r.direcionamento)}</pre><h3>Informações adicionais</h3><pre style='white-space:pre-wrap'>${esc(r.info)}</pre>`
-        : `<h2>❌ IA não está funcionando</h2>Motivo: <b>${esc(r.motivo)}</b><p>Chave configurada: ${OPENAI_API_KEY ? "sim (termina em …" + esc(OPENAI_API_KEY.slice(-4)) + ")" : "não"}</p>`) +
-      "</body>", "text/html; charset=utf-8");
-  }
-
   if (path === "/preview" && req.method === "GET") {
-    return send(res, 200, formHtmlFor(publicOrigin(req)), "text/html; charset=utf-8");
+    return send(res, 200, formHtml(), "text/html; charset=utf-8");
   }
 
   if (path === "/api/gerar" && req.method === "POST") {
@@ -390,7 +339,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 400, { jsonrpc: "2.0", id: null, error: { code: -32700, message: "JSON inválido" } });
     }
     const batch = Array.isArray(msg);
-    const replies = (await Promise.all((batch ? msg : [msg]).map(m => handleRpc(m, { origin: publicOrigin(req) })))).filter(Boolean);
+    const replies = (await Promise.all((batch ? msg : [msg]).map(handleRpc))).filter(Boolean);
     if (replies.length === 0) { res.writeHead(202, { "Access-Control-Allow-Origin": "*" }); return res.end(); }
     return send(res, 200, batch ? replies : replies[0]);
   }
