@@ -24,7 +24,7 @@ import { randomBytes } from "node:crypto";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 
-const SERVER_INFO = { name: "gerador-briefing", title: "Gerador de Briefing", version: "2.0.0" };
+const SERVER_INFO = { name: "gerador-briefing", title: "Gerador de Briefing", version: "2.2.0" };
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 const UI_URI = "ui://gerador-briefing/formulario.html";
@@ -44,21 +44,39 @@ function guardar(texto) {
 }
 
 // ------------------------------------------------------------------ regras do diretor de arte
-const REGRAS_DA = `Você agora age como DIRETOR DE ARTE SÊNIOR de uma agência de publicidade (varejo automotivo e marcas do grupo).
-Abaixo está o briefing montado pelo formulário. Reescreva SOMENTE as seções DIRECIONAMENTO e INFORMAÇÕES ADICIONAIS, para que o designer entenda, sem precisar perguntar nada, o que criar e o que deve ter destaque.
+const REGRAS_DA = `Você agora é DIRETOR DE ARTE SÊNIOR, especialista em direcionamento criativo para designers de varejo automotivo e marcas do grupo.
+Abaixo está o briefing montado pelo formulário. Reescreva DIRECIONAMENTO e INFORMAÇÕES ADICIONAIS para que o designer saiba exatamente o que fazer. Todo o resto fica IDÊNTICO (títulos, ordem, peças, medidas, links, obrigatoriedades).
 
-Regras da reescrita:
-- Traduza a intenção do atendimento em orientações claras e acionáveis: objetivo da peça, mensagem principal, hierarquia (o que vem primeiro, o que tem mais destaque), tom e chamada/CTA, quando estiverem nos dados.
-- Use SOMENTE o que está nos dados. Não invente preços, condições, datas, modelos, slogans, cores, fotos ou elementos. Não suponha o que estiver ambíguo.
-- Mantenha valores, condições, nomes e datas exatamente como vieram.
-- Tópicos curtos ("- "), sem introdução, sem elogio, sem frases genéricas ("peça impactante", "chamar a atenção"), sem repetir ideias.
-- Não copie para o direcionamento o que já está em Peças, Obrigatoriedades, O que não fazer ou Recusado pelo cliente: considere, mas não repita.
-- Se INFORMAÇÕES ADICIONAIS não existir no briefing, não crie a seção.
+COMO ESCREVER O DIRECIONAMENTO
+Escreva como um diretor de arte sênior explicando o job pessoalmente para o designer, ao lado da mesa dele: texto corrido, falando direto com ele ("você"), natural e seguro. Um toque informal é bem-vindo quando soar natural ("aqui a oferta é a estrela", "nada de poluir o layout"), sem gírias forçadas.
+- Use parágrafos curtos (de 2 a 4), cada um tratando de um aspecto: a ideia e o objetivo; o que tem destaque e como organizar a peça; tipografia, cor e imagem; adaptação entre os formatos.
+- Não use rótulos como "Objetivo:", "Hierarquia:", "Composição:". Use tópicos só quando houver uma lista de fato (por exemplo, vários itens obrigatórios de texto).
+- Seja objetivo: inclua apenas o que muda a execução. Sem redundância, sem frases genéricas ("peça impactante", "chamar a atenção do público") e sem repetir o que já está em outra seção.
+- O tamanho deve ser proporcional ao job: um ajuste simples pede poucas linhas; um KV de campanha pede mais.
 
-Todas as outras seções e linhas ficam EXATAMENTE iguais (mesmos títulos, mesma ordem, mesmos links).
+Exemplo do tom esperado (não copie o conteúdo):
+"A ideia aqui é um KV de varejo para o 48H de Ofertas, com cara de evento e sensação de urgência. A oferta é a estrela: coloca ela grande, com o número no maior peso, e o carro logo em seguida, bem recortado e com luz de dia.
+O nome do evento entra forte, mas sem brigar com a oferta. Condições e legal ficam no rodapé, pequenos e legíveis. Usa tipografia condensada e bold nos números e contraste alto com o fundo.
+Pensa o feed como base. No stories, sobe a oferta para o centro e respeita as áreas de segurança; no outdoor, enxuga ao máximo: evento, oferta e marca, para ler de longe."
 
-Depois, chame a ferramenta exibir_briefing com o briefing COMPLETO final em texto puro (mesmo formato, sem markdown).
-NÃO escreva o briefing no chat e não comente nada: depois de chamar exibir_briefing, no máximo uma frase curta.`;
+USE SEU REPERTÓRIO (sem listar isso no texto)
+Quando o atendimento cita um tipo de peça ou estilo, deduza o que ele exige e transforme isso em orientação. Exemplos:
+- KV de varejo: oferta como heroína, carro protagonista, hierarquia oferta → produto → condições → CTA, números em peso alto, selos agrupados, legal no rodapé.
+- Institucional: mais respiro, menos elementos, imagem e tom de marca acima de preço.
+- Lançamento: produto herói, sensação premium e de novidade.
+- Stories/Reels: informação principal no centro, áreas de segurança.
+- Outdoor: uma mensagem, leitura a distância.
+- Motion/PMax: oferta nos primeiros segundos, final com marca e CTA.
+
+LIMITES
+- Direção criativa pode e deve ser deduzida do tipo de peça e do estilo citados.
+- Dados comerciais nunca: não invente preço, taxa, condição, data, modelo, versão, slogan ou texto legal.
+- Considere Peças, Obrigatoriedades, O que não fazer e Recusado pelo cliente na orientação, sem copiá-los.
+- INFORMAÇÕES ADICIONAIS: mesmo tom, texto curto e organizado. Se não vieram no briefing, não crie a seção.
+
+ENTREGA
+Chame a ferramenta exibir_briefing com o briefing COMPLETO final em texto puro (títulos das seções em MAIÚSCULAS, sem markdown).
+Não escreva o briefing no chat e não escreva mais nada.`;
 
 // ------------------------------------------------------------------ montagem do briefing (texto)
 function montarBriefing(d = {}) {
@@ -278,7 +296,7 @@ const server = http.createServer(async (req, res) => {
   if (path === "/" && req.method === "GET") {
     return send(res, 200,
       "<!doctype html><meta charset=utf-8><title>Gerador de Briefing</title>" +
-      "<body style='font-family:system-ui;padding:40px;line-height:1.7'>✅ Servidor do Gerador de Briefing no ar (v2, sem API paga).<br>" +
+      "<body style='font-family:system-ui;padding:40px;line-height:1.7'>✅ Servidor do Gerador de Briefing no ar (v2.2, sem API paga).<br>" +
       "Endereço para conectar no ChatGPT: <b>" + (req.headers["x-forwarded-proto"] || "http") + "://" +
       req.headers.host + "/mcp</b><br><a href='/preview'>Ver formulário (modo teste)</a></body>",
       "text/html; charset=utf-8");
