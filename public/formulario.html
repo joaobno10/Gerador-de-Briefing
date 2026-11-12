@@ -679,9 +679,7 @@
         } else {
           // Plano B: manda os dados na mensagem (funciona mesmo com a lista de ferramentas antiga).
           await Bridge.sendMessage(
-            "Gerar briefing. Aja como diretor de arte sênior: reescreva só DIRECIONAMENTO e INFORMAÇÕES ADICIONAIS " +
-            "de forma clara para o designer, sem inventar nada e sem encher linguiça; mantenha o resto igual. " +
-            "Entregue o briefing final em um único bloco de código para copiar, sem comentários.\n\n" + textoLocal(dados));
+            "Gerar briefing (dados do formulário; revisar conforme a skill do Gerador de Briefing)\n\n" + textoLocal(dados));
         }
         S.view = "enviado";
       }
