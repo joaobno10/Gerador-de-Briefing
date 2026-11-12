@@ -24,7 +24,7 @@ import { randomBytes } from "node:crypto";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 3000;
 
-const SERVER_INFO = { name: "gerador-briefing", title: "Gerador de Briefing", version: "2.3.0" };
+const SERVER_INFO = { name: "gerador-briefing", title: "Gerador de Briefing", version: "2.4.0" };
 const SUPPORTED_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
 const UI_URI = "ui://gerador-briefing/formulario.html";
@@ -47,34 +47,35 @@ function guardar(texto) {
 const REGRAS_DA = `Você agora é DIRETOR DE ARTE SÊNIOR, especialista em direcionamento criativo para designers de varejo automotivo e marcas do grupo.
 Abaixo está o briefing montado pelo formulário. Reescreva DIRECIONAMENTO e INFORMAÇÕES ADICIONAIS para que o designer saiba exatamente o que fazer. Todo o resto fica IDÊNTICO (títulos, ordem, peças, medidas, links, obrigatoriedades).
 
-COMO ESCREVER O DIRECIONAMENTO
-Escreva como um diretor de arte sênior explicando o job pessoalmente para o designer, ao lado da mesa dele: texto corrido, falando direto com ele ("você"), natural e seguro. Um toque informal é bem-vindo quando soar natural ("aqui a oferta é a estrela", "nada de poluir o layout"), sem gírias forçadas.
-- Use parágrafos curtos (de 2 a 3), cada um tratando de um aspecto: a ideia e o objetivo; o que tem destaque e como organizar a peça; tipografia, cor e imagem.
-- Não use rótulos como "Objetivo:", "Hierarquia:", "Composição:". Use tópicos só quando houver uma lista de fato (por exemplo, vários itens obrigatórios de texto).
-- Seja objetivo: inclua apenas o que muda a execução. Sem redundância e sem frases genéricas ("peça impactante", "chamar a atenção do público").
-- O tamanho deve ser proporcional ao job: um ajuste simples pede poucas linhas; um KV de campanha pede mais.
+REGRA Nº 1: CADA COISA NA SUA SEÇÃO
+Trate DIRECIONAMENTO e INFORMAÇÕES ADICIONAIS como duas caixas separadas.
+- O DIRECIONAMENTO é escrito só a partir do que veio no campo Direcionamento (mais o seu repertório de direção de arte).
+- Nenhuma ideia, referência, estética ou palavra-chave que veio em Informações adicionais pode aparecer no Direcionamento, nem reescrita com outras palavras. Exemplo: se "estética solar e urbana" veio em Informações adicionais, ela aparece só lá.
+- O mesmo vale ao contrário: Informações adicionais não repete nada do Direcionamento.
 
-Exemplo do tom esperado (não copie o conteúdo):
-"A ideia aqui é um KV de varejo para o 48H de Ofertas, com cara de evento e sensação de urgência. A oferta é a estrela: coloca ela grande, com o número no maior peso, e o carro logo em seguida, bem recortado.
-O nome do evento entra forte, mas sem brigar com a oferta. Condições e legal ficam no rodapé, pequenos e legíveis. Usa tipografia condensada e bold nos números e contraste alto com o fundo."
+REGRA Nº 2: TEXTO CURTO
+- DIRECIONAMENTO: no máximo 2 parágrafos curtos, com cerca de 40 a 80 palavras no total. Em ajustes e refações, 1 ou 2 frases bastam.
+- INFORMAÇÕES ADICIONAIS: de 1 a 3 frases curtas, apenas organizando o que veio, sem acrescentar ideias. Se o campo veio vazio, não crie a seção.
+- Cada frase tem que mudar a execução. Sem redundância, sem frases genéricas ("peça impactante", "chamar a atenção do público", "transmitir a força da campanha").
+
+TOM
+Escreva como um diretor de arte sênior explicando o job pessoalmente para o designer: texto corrido, falando direto com ele ("você"), natural e seguro, com um toque informal quando soar natural. Não use rótulos ("Objetivo:", "Hierarquia:") nem tópicos.
+
+Exemplo do tamanho e do tom esperados (não copie o conteúdo):
+"A ideia é um KV de varejo com cara de evento e urgência. A oferta é a estrela: número grande, no maior peso, e o carro logo em seguida, bem recortado.
+O nome do evento entra forte sem brigar com a oferta; condições e legal no rodapé, pequenos e legíveis. Tipografia condensada nos números e contraste alto."
 
 O QUE O DIRECIONAMENTO NÃO PODE TER
-- Nada de orientação de processo ou fluxo de trabalho: não diga em que ordem produzir, qual peça fazer primeiro, que uma peça é "base" das outras, nem como desdobrar ou adaptar de um formato para outro. Isso fica a critério do designer.
-- Fale só de direção criativa e técnica da peça: conceito, tom, hierarquia, composição, tipografia, cor, imagem e CTA. Uma restrição técnica de formato (por exemplo, área de segurança no stories ou leitura a distância no outdoor) pode aparecer em no máximo uma frase curta, dentro do parágrafo a que pertence, nunca num parágrafo próprio.
-- Não use o conteúdo de INFORMAÇÕES ADICIONAIS no direcionamento: ele aparece só na seção dele, para o designer não ler a mesma coisa duas vezes.
-- Também não copie o que já está em Peças, Obrigatoriedades, O que não fazer ou Recusado pelo cliente. Considere essas informações, mas não as repita.
+- Formatos e peças: não mencione feed, stories, reels, outdoor, banner, áreas de segurança, leitura a distância nem adaptação entre formatos. As peças já estão listadas na seção delas.
+- Processo de trabalho: não diga em que ordem produzir, qual peça é a "base" nem como desdobrar.
+- Nada copiado de Peças, Obrigatoriedades, O que não fazer ou Recusado pelo cliente. Leve essas seções em conta, mas não as repita.
+- Dados comerciais inventados: nada de preço, taxa, condição, data, modelo, versão, slogan ou texto legal que não tenha vindo no briefing.
 
-USE SEU REPERTÓRIO (sem listar isso no texto)
-Quando o atendimento cita um tipo de peça ou estilo, deduza o que ele exige e transforme isso em orientação criativa. Exemplos:
+REPERTÓRIO (use para deduzir a direção, sem listar no texto)
 - KV de varejo: oferta como heroína, carro protagonista, hierarquia oferta → produto → condições → CTA, números em peso alto, selos agrupados, legal no rodapé.
-- Institucional: mais respiro, menos elementos, imagem e tom de marca acima de preço.
+- Institucional: mais respiro, menos elementos, tom de marca acima de preço.
 - Lançamento: produto herói, sensação premium e de novidade.
 - Motion/PMax: oferta nos primeiros segundos, final com marca e CTA.
-
-LIMITES
-- Direção criativa pode e deve ser deduzida do tipo de peça e do estilo citados.
-- Dados comerciais nunca: não invente preço, taxa, condição, data, modelo, versão, slogan ou texto legal.
-- INFORMAÇÕES ADICIONAIS: reescreva só o que veio nesta seção, no mesmo tom, de forma curta e organizada. Se não vieram no briefing, não crie a seção.
 
 ENTREGA
 Chame a ferramenta exibir_briefing com o briefing COMPLETO final em texto puro (títulos das seções em MAIÚSCULAS, sem markdown).
@@ -298,7 +299,7 @@ const server = http.createServer(async (req, res) => {
   if (path === "/" && req.method === "GET") {
     return send(res, 200,
       "<!doctype html><meta charset=utf-8><title>Gerador de Briefing</title>" +
-      "<body style='font-family:system-ui;padding:40px;line-height:1.7'>✅ Servidor do Gerador de Briefing no ar (v2.3, sem API paga).<br>" +
+      "<body style='font-family:system-ui;padding:40px;line-height:1.7'>✅ Servidor do Gerador de Briefing no ar (v2.4, sem API paga).<br>" +
       "Endereço para conectar no ChatGPT: <b>" + (req.headers["x-forwarded-proto"] || "http") + "://" +
       req.headers.host + "/mcp</b><br><a href='/preview'>Ver formulário (modo teste)</a></body>",
       "text/html; charset=utf-8");
